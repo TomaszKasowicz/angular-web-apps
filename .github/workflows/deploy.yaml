@@ -24,9 +24,18 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
+      - uses: actions/cache@v3
+        id: npm-cache
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
       - run: npm ci
+        if: steps.npm-cache.outputs.cache-hit != 'true'
+
       - uses: nrwl/nx-set-shas@v4
-      # - run: npx nx run-many -t build --configuration production
+      - run: npx nx run-many -t build --configuration production
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
@@ -36,14 +45,10 @@ jobs:
           action: "upload"
           ###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
           # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
-          app_build_command: "npx nx run-many -t buid --configuration ${{ github.event_name == 'pull_request' && 'development' || 'production'}}" # The build command for your app
-          app_location: "/apps/angular-web-apps" # App source code path or dist path when app skipped building - optional
+          app_location: "/dist/apps/angular-web-apps/browser" # App source code path or dist path when app skipped building - optional
           output_location: "/dist/apps/angular-web-apps/browser" # Built app content directory - optional
           skip_api_build: true # Skip building api app - optional
-        env:
-          PLATFORM_NAME: "nodejs"
-          PLATFORM_VERSION: 20
-          NODE_VERSION: 20
+          skip_app_build: true
           ###### End of Repository/Build Configurations ######
 
   close_pull_request_job:
