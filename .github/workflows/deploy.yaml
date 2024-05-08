@@ -38,7 +38,6 @@ jobs:
           # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
           app_build_command: "npx nx run-many -t buid --configuration ${{ github.event_name == 'pull_request' && 'development' || 'production'}}" # The build command for your app
           app_location: "/apps/angular-web-apps" # App source code path or dist path when app skipped building - optional
-          api_location: "" # Api source code path - optional
           output_location: "/dist/apps/angular-web-apps/browser" # Built app content directory - optional
           ###### End of Repository/Build Configurations ######
 
