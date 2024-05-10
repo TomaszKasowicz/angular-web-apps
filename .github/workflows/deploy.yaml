@@ -94,6 +94,11 @@ jobs:
         with:
           inlineScript: |
             az storage blob upload-batch --account-name ${{ vars.STORAGE_ACCOUNT_NAME }} --auth-mode key -d '$web' -s dist/apps/angular-web-apps/browser
+      - name: Upload to blob storage
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az storage blob upload-batch --account-name ${{ vars.STORAGE_ACCOUNT_NAME }} --auth-mode key -d 'cdn' -s dist/apps/angular-web-apps/browser
       - name: Purge CDN endpoint
         if: false # Skip
         uses: azure/CLI@v1
