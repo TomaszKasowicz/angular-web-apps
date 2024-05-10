@@ -10,20 +10,22 @@ on:
       - main
 
 jobs:
-  build_and_deploy_job:
+  build:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
-    name: Build and Deploy Job
+    name: Build App
     steps:
       - uses: actions/checkout@v3
         with:
           submodules: true
           lfs: false
           fetch-depth: 0
+
       - uses: actions/setup-node@v3
         with:
           node-version: 20
           cache: 'npm'
+
       - uses: actions/cache@v3
         id: npm-cache
         with:
@@ -31,12 +33,34 @@ jobs:
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
+
       - run: npm ci
         if: steps.npm-cache.outputs.cache-hit != 'true'
 
       - uses: nrwl/nx-set-shas@v4
+
       - run: npx nx run-many -t build --configuration production
-      - name: Build And Deploy
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle
+          path: "/dist/apps/angular-web-apps/browser"
+          if-no-files-found: error
+          retention-days: 1
+          
+  deploy_to_azure_web_apps:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    name: Deploy to Azure Web Apps
+    needs: build
+    steps:
+      - uses: actions/download-artifact@v4
+        name: Download Build Artifact
+        with:
+          name: bundle
+          path: "/dist/apps/angular-web-apps/browser"
+          
+      - name: Deploy to Azure Web Apps
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
@@ -46,11 +70,43 @@ jobs:
           ###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
           # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
           app_location: "/dist/apps/angular-web-apps/browser" # App source code path or dist path when app skipped building - optional
-          output_location: "/dist/apps/angular-web-apps/browser" # Built app content directory - optional
           skip_api_build: true # Skip building api app - optional
           skip_app_build: true
           ###### End of Repository/Build Configurations ######
 
+  deploy_to_azure_storage_account:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    name: Deploy to Azure Storage Account
+    needs: build
+    environment: azure
+    steps:
+      - uses: actions/download-artifact@v4
+        name: Download Build Artifact
+        with:
+          name: bundle
+          path: "/dist/apps/angular-web-apps/browser"
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Upload to blob storage
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az storage blob upload-batch --account-name ${{ vars.STORAGE_ACCOUNT_NAME }} --auth-mode key -d '$web' -s .
+      - name: Purge CDN endpoint
+        if: false # Skip
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+           az cdn endpoint purge --content-paths  "/*" --profile-name "CDN_PROFILE_NAME" --name "CDN_ENDPOINT" --resource-group "RESOURCE_GROUP"
+
+      # Azure logout
+      - name: logout
+        run: |
+            az logout
+        if: always()
+        
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
@@ -62,4 +118,4 @@ jobs:
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DELIGHTFUL_ISLAND_0C1297903 }}
           action: "close"
-          app_location: "/apps/angular-web-apps" # App source code path
+          app_location: "/dist/apps/angular-web-apps/browser" # App source code path
